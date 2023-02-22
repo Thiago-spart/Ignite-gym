@@ -13,7 +13,7 @@ export const HomeHeader = () => {
 				alt="Imagem do usuário"
 			/>
 
-			<VStack flex={1} ml={4}>
+			<VStack flex={1}>
 				<Text color="gray.100" fontSize="md">
 					Olá
 				</Text>

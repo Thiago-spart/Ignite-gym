@@ -21,7 +21,7 @@ export const ExerciseCard: React.FC<ExerciseCardProps> = ({ ...rest }) => {
 					w={16}
 					h={16}
 					mr={4}
-					resizeMode="center"
+					resizeMode="cover"
 					rounded="md"
 				/>
 

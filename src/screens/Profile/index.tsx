@@ -12,18 +12,46 @@ import {
 	VStack,
 } from "native-base";
 import React from "react";
-import { Alert, TouchableOpacity } from "react-native";
+import { TouchableOpacity } from "react-native";
+import { yupResolver } from "@hookform/resolvers/yup";
 
+import * as yup from "yup";
 import * as ImagePicker from "expo-image-picker";
 import * as FileSystem from "expo-file-system";
+import { Controller, useForm } from "react-hook-form";
+import { ProfileFormDataProps } from "./types";
 
 const PHOTO_SIZE = 33;
+
+const profileSchema = yup.object({
+	name: yup.string().length(3, "O nome deve possuir mais de 3 caracteres"),
+	old_password: yup
+		.string()
+		.required("Informe a senha")
+		.min(6, "A senha deve ter pelo menos 6 dígitos"),
+	new_password: yup
+		.string()
+		.required("Informe a senha")
+		.min(6, "A senha deve ter pelo menos 6 dígitos"),
+	new_password_confirmation: yup
+		.string()
+		.required("Confirme a senha.")
+		.oneOf([yup.ref("password")], "A confirmação da senha não confere."),
+});
 
 export const Profile = () => {
 	const [isPhotoLoading, setIsPhotoLoading] = React.useState(false);
 	const [userPhoto, setUserPhoto] = React.useState(
 		"https://github.com/Thiago-spart.png"
 	);
+
+	const {
+		control,
+		handleSubmit,
+		formState: { errors },
+	} = useForm<ProfileFormDataProps>({
+		resolver: yupResolver(profileSchema),
+	});
 
 	const toast = useToast();
 
@@ -60,6 +88,8 @@ export const Profile = () => {
 		}
 	};
 
+	const handleUpdateProfile = (data: ProfileFormDataProps) => {};
+
 	return (
 		<VStack flex={1}>
 			<ScreenHeader title="Perfil" />
@@ -95,7 +125,19 @@ export const Profile = () => {
 						</Text>
 					</TouchableOpacity>
 
-					<Input bg="gray.600" placeholder="Nome" />
+					<Controller
+						control={control}
+						name="name"
+						render={({ field: { onChange, value } }) => (
+							<Input
+								placeholder="Nome"
+								bg="gray.600"
+								onChangeText={onChange}
+								value={value}
+								errorMessage={errors.name?.message}
+							/>
+						)}
+					/>
 
 					<Input
 						bg="gray.600"
@@ -112,21 +154,63 @@ export const Profile = () => {
 						mb={2}
 						alignSelf="flex-start"
 						mt={12}
+						fontFamily="heading"
 					>
 						Alterar senha
 					</Heading>
 
-					<Input bg="gray.600" placeholder="Senha antiga" secureTextEntry />
-
-					<Input bg="gray.600" placeholder="Nova senha" secureTextEntry />
-
-					<Input
-						bg="gray.600"
-						placeholder="Confirme a nova senha"
-						secureTextEntry
+					<Controller
+						control={control}
+						name="old_password"
+						render={({ field: { onChange, value } }) => (
+							<Input
+								placeholder="Senha antiga"
+								onChangeText={onChange}
+								secureTextEntry
+								value={value}
+								errorMessage={errors.old_password?.message}
+								bg="gray.600"
+							/>
+						)}
 					/>
 
-					<Button title="Atualizar" mt={4} />
+					<Controller
+						control={control}
+						name="new_password"
+						render={({ field: { onChange, value } }) => (
+							<Input
+								placeholder="Nova senha"
+								onChangeText={onChange}
+								secureTextEntry
+								value={value}
+								errorMessage={errors.new_password?.message}
+								bg="gray.600"
+							/>
+						)}
+					/>
+
+					<Controller
+						control={control}
+						name="new_password_confirmation"
+						render={({ field: { onChange, value } }) => (
+							<Input
+								placeholder="Confirme a nova senha"
+								onChangeText={onChange}
+								secureTextEntry
+								value={value}
+								errorMessage={errors.new_password?.message}
+								onSubmitEditing={handleSubmit(handleUpdateProfile)}
+								returnKeyType="send"
+								bg="gray.600"
+							/>
+						)}
+					/>
+
+					<Button
+						title="Atualizar"
+						mt={4}
+						onPress={handleSubmit(handleUpdateProfile)}
+					/>
 				</Center>
 			</ScrollView>
 		</VStack>

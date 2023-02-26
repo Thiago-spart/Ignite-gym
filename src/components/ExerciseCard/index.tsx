@@ -26,7 +26,7 @@ export const ExerciseCard: React.FC<ExerciseCardProps> = ({ ...rest }) => {
 				/>
 
 				<VStack flex={1}>
-					<Heading fontSize="lg" color="white">
+					<Heading fontSize="lg" color="white" fontFamily="heading">
 						Remada unilateral
 					</Heading>
 

@@ -8,15 +8,57 @@ import {
 	ScrollView,
 	Skeleton,
 	Text,
+	useToast,
 	VStack,
 } from "native-base";
 import React from "react";
-import { TouchableOpacity } from "react-native";
+import { Alert, TouchableOpacity } from "react-native";
+
+import * as ImagePicker from "expo-image-picker";
+import * as FileSystem from "expo-file-system";
 
 const PHOTO_SIZE = 33;
 
 export const Profile = () => {
 	const [isPhotoLoading, setIsPhotoLoading] = React.useState(false);
+	const [userPhoto, setUserPhoto] = React.useState(
+		"https://github.com/Thiago-spart.png"
+	);
+
+	const toast = useToast();
+
+	const handleSelectUserPhoto = async () => {
+		setIsPhotoLoading(true);
+
+		try {
+			const selectedPhoto = await ImagePicker.launchImageLibraryAsync({
+				mediaTypes: ImagePicker.MediaTypeOptions.Images,
+				quality: 1,
+				aspect: [4, 4],
+				allowsEditing: true,
+			});
+
+			if (selectedPhoto.canceled) return;
+
+			const photoInfo = await FileSystem.getInfoAsync(
+				selectedPhoto.assets[0].uri
+			);
+
+			if (photoInfo.size && photoInfo.size / 1024 / 1024 > 5) {
+				return toast.show({
+					title: "Essa imagem é muito grande. Escolha uma de até 5MB.",
+					placement: "top",
+					bgColor: "red.500",
+				});
+			}
+
+			setUserPhoto(String(selectedPhoto.assets[0].uri));
+		} catch (error) {
+			console.log(error);
+		} finally {
+			setIsPhotoLoading(false);
+		}
+	};
 
 	return (
 		<VStack flex={1}>
@@ -34,13 +76,13 @@ export const Profile = () => {
 						/>
 					) : (
 						<UserPhoto
-							source={{ uri: "https://github.com/Thiago-spart.png" }}
+							source={{ uri: userPhoto }}
 							size={PHOTO_SIZE}
 							alt="Imagem do usuário"
 						/>
 					)}
 
-					<TouchableOpacity>
+					<TouchableOpacity onPress={handleSelectUserPhoto}>
 						<Text
 							color="green.500"
 							fontWeight="bold"

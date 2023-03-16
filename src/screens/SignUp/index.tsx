@@ -1,4 +1,12 @@
-import { Center, Heading, Image, ScrollView, Text, VStack } from "native-base";
+import {
+	Center,
+	Heading,
+	Image,
+	ScrollView,
+	Text,
+	useToast,
+	VStack,
+} from "native-base";
 
 import BackgroundImg from "@assets/background.png";
 import LogoSvg from "@assets/logo.svg";
@@ -11,6 +19,10 @@ import { SignUpFormDataProps } from "./types";
 import { yupResolver } from "@hookform/resolvers/yup";
 
 import * as yup from "yup";
+import { api } from "@services/api";
+import axios from "axios";
+import { AppError } from "@utils/AppError";
+import { useAuth } from "@hooks/useAuth";
 
 const singUpSchema = yup.object({
 	name: yup.string().required("Informe o nome"),
@@ -26,7 +38,12 @@ const singUpSchema = yup.object({
 });
 
 export const SignUp = () => {
+	const [isLoading, setIsLoading] = React.useState(false);
+
 	const navigation = useNavigation();
+	const toast = useToast();
+
+	const { signIn } = useAuth();
 
 	const {
 		control,
@@ -40,7 +57,40 @@ export const SignUp = () => {
 		navigation.goBack();
 	};
 
-	const handleSignUp = (data: SignUpFormDataProps) => {};
+	const handleSignUp = async ({
+		name,
+		email,
+		password,
+	}: SignUpFormDataProps) => {
+		try {
+			setIsLoading(true);
+
+			await api.post("/users", { name, email, password });
+
+			await signIn(email, password);
+
+			toast.show({
+				title: "Cadastrado com sucesso",
+				placement: "top",
+			});
+
+			return navigation.goBack();
+		} catch (error) {
+			setIsLoading(true);
+
+			const isAppError = error instanceof AppError;
+
+			const errorMessage = isAppError
+				? error.message
+				: "Não foi possível criar a conta. Tente mais tarde";
+
+			return toast.show({
+				title: errorMessage,
+				bg: "red.500",
+				placement: "top",
+			});
+		}
+	};
 
 	return (
 		<ScrollView
@@ -127,7 +177,11 @@ export const SignUp = () => {
 						)}
 					/>
 
-					<Button title="Criar conta" onPress={handleSubmit(handleSignUp)} />
+					<Button
+						title="Criar conta"
+						onPress={handleSubmit(handleSignUp)}
+						isLoading={isLoading}
+					/>
 				</Center>
 
 				<Button

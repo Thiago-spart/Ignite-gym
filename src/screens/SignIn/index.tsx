@@ -1,4 +1,12 @@
-import { Center, Heading, Image, ScrollView, Text, VStack } from "native-base";
+import {
+	Center,
+	Heading,
+	Image,
+	ScrollView,
+	Text,
+	useToast,
+	VStack,
+} from "native-base";
 
 import BackgroundImg from "@assets/background.png";
 import LogoSvg from "@assets/logo.svg";
@@ -11,6 +19,9 @@ import { yupResolver } from "@hookform/resolvers/yup";
 import * as yup from "yup";
 import { SignInFormDataProps } from "./types";
 import { Controller, useForm } from "react-hook-form";
+import { useAuth } from "@hooks/useAuth";
+import { AppError } from "@utils/AppError";
+import React from "react";
 
 const singInSchema = yup.object({
 	email: yup.string().required("Informe o e-mail").email("E-mail inválido"),
@@ -20,10 +31,11 @@ const singInSchema = yup.object({
 		.min(6, "A senha deve ter pelo menos 6 dígitos"),
 });
 
-const handleSignIn = (data: SignInFormDataProps) => {};
-
 export const SignIn = () => {
+	const [isLoading, setIsLoading] = React.useState(false);
 	const navigation = useNavigation<AuthNavigatorRouterProps>();
+	const { signIn } = useAuth();
+	const toast = useToast();
 
 	const {
 		control,
@@ -35,6 +47,27 @@ export const SignIn = () => {
 
 	const handleNewAccount = () => {
 		navigation.navigate("signUp");
+	};
+
+	const handleSignIn = async (data: SignInFormDataProps) => {
+		try {
+			setIsLoading(true);
+			await signIn(data.email, data.password);
+		} catch (error) {
+			const isAppError = error instanceof AppError;
+
+			const title = isAppError
+				? error.message
+				: "Não foi possível entrar. Tente novamente mais tarde.";
+
+			setIsLoading(false);
+
+			toast.show({
+				title,
+				placement: "top",
+				bgColor: "red.500",
+			});
+		}
 	};
 
 	return (
@@ -95,7 +128,11 @@ export const SignIn = () => {
 						)}
 					/>
 
-					<Button title="Acessar" onPress={handleSubmit(handleSignIn)} />
+					<Button
+						title="Acessar"
+						onPress={handleSubmit(handleSignIn)}
+						isLoading={isLoading}
+					/>
 				</Center>
 
 				<Center mt={24}>

@@ -28,12 +28,16 @@ export const AuthContextProvider = ({ children }: AuthContextProviderProps) => {
 		setUser(userData);
 	};
 
-	const storageUserAndTokenSave = async (userData: UserDTO, token: string) => {
+	const storageUserAndTokenSave = async (
+		userData: UserDTO,
+		token: string,
+		refresh_token: string
+	) => {
 		try {
 			setIsLoadingUserStorageData(true);
 
 			await storageUserSave(userData);
-			await storageAuthTokenSave(token);
+			await storageAuthTokenSave({ token, refresh_token });
 		} catch (error) {
 			throw error;
 		} finally {
@@ -45,8 +49,12 @@ export const AuthContextProvider = ({ children }: AuthContextProviderProps) => {
 		try {
 			const { data } = await api.post("/sessions", { email, password });
 
-			if (data.user && data.token) {
-				await storageUserAndTokenSave(data.user, data.token);
+			if (data.user && data.token && data.refresh_token) {
+				await storageUserAndTokenSave(
+					data.user,
+					data.token,
+					data.refresh_token
+				);
 
 				userAndTokenUpdate(data.user, data.token);
 			}
@@ -71,13 +79,23 @@ export const AuthContextProvider = ({ children }: AuthContextProviderProps) => {
 		}
 	};
 
+	const updateUserProfile = async (userUpdated: UserDTO) => {
+		try {
+			setUser(userUpdated);
+
+			await storageUserSave(userUpdated);
+		} catch (error) {
+			throw error;
+		}
+	};
+
 	const loadUserData = async () => {
 		try {
 			setIsLoadingUserStorageData(true);
 
 			const userLogged = await storageUserGet();
 
-			const token = await storageAuthTokenGet();
+			const { token } = await storageAuthTokenGet();
 
 			if (token && userLogged) {
 				userAndTokenUpdate(userLogged, token);
@@ -93,9 +111,23 @@ export const AuthContextProvider = ({ children }: AuthContextProviderProps) => {
 		loadUserData();
 	}, []);
 
+	React.useEffect(() => {
+		const subscribe = api.registerInterceptTokenManager(signOut);
+
+		return () => {
+			subscribe;
+		};
+	}, [signOut]);
+
 	return (
 		<AuthContext.Provider
-			value={{ user, signIn, signOut, isLoadingUserStorageData }}
+			value={{
+				user,
+				signIn,
+				signOut,
+				isLoadingUserStorageData,
+				updateUserProfile,
+			}}
 		>
 			{children}
 		</AuthContext.Provider>

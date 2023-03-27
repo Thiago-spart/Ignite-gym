@@ -3,8 +3,12 @@ import { TouchableOpacity } from "react-native";
 import { ExerciseCardProps } from "./types";
 
 import { Entypo } from "@expo/vector-icons";
+import { api } from "@services/api";
 
-export const ExerciseCard: React.FC<ExerciseCardProps> = ({ ...rest }) => {
+export const ExerciseCard: React.FC<ExerciseCardProps> = ({
+	data,
+	...rest
+}) => {
 	return (
 		<TouchableOpacity {...rest}>
 			<HStack
@@ -16,8 +20,10 @@ export const ExerciseCard: React.FC<ExerciseCardProps> = ({ ...rest }) => {
 				mb={3}
 			>
 				<Image
-					source={{ uri: "#" }}
-					alt="Imagem do exercício"
+					source={{
+						uri: `${api.defaults.baseURL}/exercise/thumb/${data.thumb}`,
+					}}
+					alt={data.name}
 					w={16}
 					h={16}
 					mr={4}
@@ -27,11 +33,11 @@ export const ExerciseCard: React.FC<ExerciseCardProps> = ({ ...rest }) => {
 
 				<VStack flex={1}>
 					<Heading fontSize="lg" color="white" fontFamily="heading">
-						Remada unilateral
+						{data.name}
 					</Heading>
 
 					<Text fontSize="sm" color="gray.200" mt={1} numberOfLines={2}>
-						3 séries X 12 repetições
+						{data.series} séries X {data.repetitions} repetições
 					</Text>
 				</VStack>
 

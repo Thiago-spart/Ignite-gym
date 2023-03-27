@@ -20,30 +20,40 @@ import * as ImagePicker from "expo-image-picker";
 import * as FileSystem from "expo-file-system";
 import { Controller, useForm } from "react-hook-form";
 import { ProfileFormDataProps } from "./types";
+import { useAuth } from "@hooks/useAuth";
+import { api } from "@services/api";
+import { AppError } from "@utils/AppError";
+import defaultUserPhotoImg from "@assets/userPhotoDefault.png";
 
 const PHOTO_SIZE = 33;
 
 const profileSchema = yup.object({
-	name: yup.string().length(3, "O nome deve possuir mais de 3 caracteres"),
-	old_password: yup
+	name: yup.string().min(3, "O nome deve possuir mais de 3 caracteres"),
+	password: yup
 		.string()
-		.required("Informe a senha")
-		.min(6, "A senha deve ter pelo menos 6 dígitos"),
-	new_password: yup
+		.min(6, "A senha deve ter pelo menos 6 dígitos")
+		.nullable()
+		.transform((value) => (!!value ? value : null)),
+	confirm_password: yup
 		.string()
-		.required("Informe a senha")
-		.min(6, "A senha deve ter pelo menos 6 dígitos"),
-	new_password_confirmation: yup
-		.string()
-		.required("Confirme a senha.")
-		.oneOf([yup.ref("password")], "A confirmação da senha não confere."),
+		.nullable()
+		.transform((value) => (!!value ? value : null))
+		.oneOf([yup.ref("password"), null], "A confirmação de senha não confere.")
+		.when("password", {
+			is: (Field: any) => Field,
+			then: (schema) =>
+				schema
+					.nullable()
+					.required("Informe a confirmação da senha.")
+					.transform((value) => (!!value ? value : null)),
+		}),
 });
 
 export const Profile = () => {
+	const [isUpdating, setIsUpdating] = React.useState(false);
 	const [isPhotoLoading, setIsPhotoLoading] = React.useState(false);
-	const [userPhoto, setUserPhoto] = React.useState(
-		"https://github.com/Thiago-spart.png"
-	);
+
+	const { user, updateUserProfile } = useAuth();
 
 	const {
 		control,
@@ -51,6 +61,10 @@ export const Profile = () => {
 		formState: { errors },
 	} = useForm<ProfileFormDataProps>({
 		resolver: yupResolver(profileSchema),
+		defaultValues: {
+			name: user.name,
+			email: user.email,
+		},
 	});
 
 	const toast = useToast();
@@ -59,36 +73,109 @@ export const Profile = () => {
 		setIsPhotoLoading(true);
 
 		try {
-			const selectedPhoto = await ImagePicker.launchImageLibraryAsync({
+			const photoSelected = await ImagePicker.launchImageLibraryAsync({
 				mediaTypes: ImagePicker.MediaTypeOptions.Images,
 				quality: 1,
 				aspect: [4, 4],
 				allowsEditing: true,
 			});
 
-			if (selectedPhoto.canceled) return;
-
-			const photoInfo = await FileSystem.getInfoAsync(
-				selectedPhoto.assets[0].uri
-			);
-
-			if (photoInfo.size && photoInfo.size / 1024 / 1024 > 5) {
-				return toast.show({
-					title: "Essa imagem é muito grande. Escolha uma de até 5MB.",
-					placement: "top",
-					bgColor: "red.500",
-				});
+			if (photoSelected.canceled) {
+				return;
 			}
 
-			setUserPhoto(String(selectedPhoto.assets[0].uri));
+			if (photoSelected.assets[0].uri) {
+				const photoInfo = await FileSystem.getInfoAsync(
+					photoSelected.assets[0].uri
+				);
+
+				if (photoInfo.size && photoInfo.size / 1024 / 1024 > 5) {
+					return toast.show({
+						title: "Essa imagem é muito grande. Escolha uma de até 5MB.",
+						placement: "top",
+						bgColor: "red.500",
+					});
+				}
+
+				const fileExtension = photoSelected.assets[0].uri.split(".").pop();
+
+				const photoFile = {
+					name: `${user.name}.${fileExtension}`.toLowerCase(),
+					uri: photoSelected.assets[0].uri,
+					type: `${photoSelected.assets[0].type}/${fileExtension}`,
+				} as any;
+
+				const userPhotoUploadForm = new FormData();
+
+				userPhotoUploadForm.append("avatar", photoFile);
+
+				const avatarUpdtedResponse = await api.patch(
+					"/users/avatar",
+					userPhotoUploadForm,
+					{
+						headers: {
+							"Content-Type": "multipart/form-data",
+						},
+					}
+				);
+
+				const userUpdated = user;
+
+				userUpdated.avatar = avatarUpdtedResponse.data.avatar;
+
+				await updateUserProfile(userUpdated);
+
+				toast.show({
+					title: "Foto atualizada!",
+					placement: "top",
+					bgColor: "green.500",
+				});
+			}
 		} catch (error) {
 			console.log(error);
+			toast.show({
+				title: "Error ao fazer upload da foto",
+				placement: "top",
+				bgColor: "red.500",
+			});
 		} finally {
 			setIsPhotoLoading(false);
 		}
 	};
 
-	const handleUpdateProfile = (data: ProfileFormDataProps) => {};
+	const handleUpdateProfile = async (data: ProfileFormDataProps) => {
+		try {
+			setIsUpdating(true);
+
+			const userUpdated = user;
+
+			userUpdated.name = data.name;
+
+			await api.put("/users", data);
+
+			await updateUserProfile(userUpdated);
+
+			toast.show({
+				title: "Perfil atualizado com sucesso!",
+				placement: "top",
+				bgColor: "green.500",
+			});
+		} catch (error) {
+			const isAppError = error instanceof AppError;
+
+			const title = isAppError
+				? error.message
+				: "Não foi possível atualizar os dados. Tente novamente mais tarde.";
+
+			toast.show({
+				title,
+				placement: "top",
+				bgColor: "red.500",
+			});
+		} finally {
+			setIsUpdating(false);
+		}
+	};
 
 	return (
 		<VStack flex={1}>
@@ -106,9 +193,13 @@ export const Profile = () => {
 						/>
 					) : (
 						<UserPhoto
-							source={{ uri: userPhoto }}
+							source={
+								user.avatar
+									? { uri: `${api.defaults.baseURL}/avatar/${user.avatar}` }
+									: defaultUserPhotoImg
+							}
 							size={PHOTO_SIZE}
-							alt="Imagem do usuário"
+							alt={`Imagem do ${user.name}`}
 						/>
 					)}
 
@@ -139,11 +230,17 @@ export const Profile = () => {
 						)}
 					/>
 
-					<Input
-						bg="gray.600"
-						placeholder="E-mail"
-						value="user000.000resu@gmail.com"
-						isDisabled
+					<Controller
+						control={control}
+						name="email"
+						render={({ field: { value } }) => (
+							<Input
+								bg="gray.600"
+								placeholder="E-mail"
+								isDisabled
+								value={value}
+							/>
+						)}
 					/>
 				</Center>
 
@@ -168,7 +265,6 @@ export const Profile = () => {
 								onChangeText={onChange}
 								secureTextEntry
 								value={value}
-								errorMessage={errors.old_password?.message}
 								bg="gray.600"
 							/>
 						)}
@@ -176,14 +272,14 @@ export const Profile = () => {
 
 					<Controller
 						control={control}
-						name="new_password"
+						name="password"
 						render={({ field: { onChange, value } }) => (
 							<Input
 								placeholder="Nova senha"
 								onChangeText={onChange}
 								secureTextEntry
 								value={value}
-								errorMessage={errors.new_password?.message}
+								errorMessage={errors.password?.message}
 								bg="gray.600"
 							/>
 						)}
@@ -191,14 +287,14 @@ export const Profile = () => {
 
 					<Controller
 						control={control}
-						name="new_password_confirmation"
+						name="confirm_password"
 						render={({ field: { onChange, value } }) => (
 							<Input
 								placeholder="Confirme a nova senha"
 								onChangeText={onChange}
 								secureTextEntry
 								value={value}
-								errorMessage={errors.new_password?.message}
+								errorMessage={errors.password?.message}
 								onSubmitEditing={handleSubmit(handleUpdateProfile)}
 								returnKeyType="send"
 								bg="gray.600"
@@ -210,6 +306,7 @@ export const Profile = () => {
 						title="Atualizar"
 						mt={4}
 						onPress={handleSubmit(handleUpdateProfile)}
+						isLoading={isUpdating}
 					/>
 				</Center>
 			</ScrollView>

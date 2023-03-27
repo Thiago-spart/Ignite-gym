@@ -1,6 +1,7 @@
 export interface ProfileFormDataProps {
 	name: string;
+	email: string;
 	old_password: string;
-	new_password: string;
-	new_password_confirmation: string;
+	password: string;
+	confirm_password: string;
 }

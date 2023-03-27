@@ -1,6 +1,7 @@
 import { ExerciseCard } from "@components/ExerciseCard";
 import { Group } from "@components/Group";
 import { HomeHeader } from "@components/HomeHeader";
+import { Loading } from "@components/Loading";
 import { ExerciseDTO } from "@dtos/ExerciseDTO";
 import { useFocusEffect, useNavigation } from "@react-navigation/native";
 import { AppNavigatorRouterProps } from "@routes/app.routes";
@@ -10,16 +11,17 @@ import { FlatList, Heading, HStack, Text, useToast, VStack } from "native-base";
 import React from "react";
 
 export const Home = () => {
+	const [isLoading, setIsLoading] = React.useState(true);
 	const [groups, setGroups] = React.useState<Array<string>>([]);
 	const [exercises, setExercises] = React.useState<Array<ExerciseDTO>>([]);
-	const [groupSelected, setGroupSelected] = React.useState("costa");
+	const [groupSelected, setGroupSelected] = React.useState("antebraço");
 
 	const toast = useToast();
 
 	const navigation = useNavigation<AppNavigatorRouterProps>();
 
-	const handleOpenExerciseDetails = () => {
-		navigation.navigate("exercise");
+	const handleOpenExerciseDetails = (exerciseId: number) => {
+		navigation.navigate("exercise", { exerciseId });
 	};
 
 	const fetchGroups = async () => {
@@ -44,6 +46,8 @@ export const Home = () => {
 
 	const fetchExercisesByGroup = async () => {
 		try {
+			setIsLoading(true);
+
 			const res = await api.get(`/exercises/bygroup/${groupSelected}`);
 
 			setExercises(res.data);
@@ -59,6 +63,8 @@ export const Home = () => {
 				placement: "top",
 				bgColor: "red.500",
 			});
+		} finally {
+			setIsLoading(false);
 		}
 	};
 
@@ -94,27 +100,34 @@ export const Home = () => {
 				minH={10}
 			/>
 
-			<VStack flex={1} px={8}>
-				<HStack justifyContent="space-between" mb={5}>
-					<Heading color="gray.200" fontSize="md" fontFamily="heading">
-						Exercícios
-					</Heading>
+			{isLoading ? (
+				<Loading />
+			) : (
+				<VStack flex={1} px={8}>
+					<HStack justifyContent="space-between" mb={5}>
+						<Heading color="gray.200" fontSize="md" fontFamily="heading">
+							Exercícios
+						</Heading>
 
-					<Text color="gray.200" fontSize="sm">
-						{exercises.length}
-					</Text>
-				</HStack>
+						<Text color="gray.200" fontSize="sm">
+							{exercises.length}
+						</Text>
+					</HStack>
 
-				<FlatList
-					data={exercises}
-					keyExtractor={(item) => String(item.id)}
-					renderItem={({ item }) => (
-						<ExerciseCard onPress={handleOpenExerciseDetails} />
-					)}
-					showsVerticalScrollIndicator={false}
-					_contentContainerStyle={{ paddingBottom: 20 }}
-				/>
-			</VStack>
+					<FlatList
+						data={exercises}
+						keyExtractor={(item) => String(item.id)}
+						renderItem={({ item }) => (
+							<ExerciseCard
+								data={item}
+								onPress={() => handleOpenExerciseDetails(item.id)}
+							/>
+						)}
+						showsVerticalScrollIndicator={false}
+						_contentContainerStyle={{ paddingBottom: 20 }}
+					/>
+				</VStack>
+			)}
 		</VStack>
 	);
 };
